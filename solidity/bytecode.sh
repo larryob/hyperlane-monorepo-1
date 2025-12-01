@@ -1,8 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-OUTPUT_PATH=${1:-bytecode}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_ARG=${1:-bytecode}
+if [[ "$OUTPUT_ARG" = /* ]]; then
+    OUTPUT_PATH="$OUTPUT_ARG"
+else
+    OUTPUT_PATH="$SCRIPT_DIR/$OUTPUT_ARG"
+fi
 EXCLUDE="test|mock|interfaces|libs|upgrade|README|Abstract|Static|LayerZero|PolygonPos|Portal"
+
+pushd "$SCRIPT_DIR" > /dev/null
 
 IFS=$'\n'
 CONTRACT_FILES=($(find ./contracts -type f))
@@ -37,3 +45,5 @@ for file in "${CONTRACT_FILES[@]}"; do
         } > "$OUTPUT_PATH/$contract.bytecode.txt"
     done
 done
+
+popd > /dev/null
