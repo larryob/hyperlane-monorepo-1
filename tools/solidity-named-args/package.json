@@ -1,0 +1,23 @@
+{
+  "name": "solidity-named-args-converter",
+  "version": "1.0.0",
+  "description": "Tool to convert Solidity function calls to use named arguments",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "convert-named-args": "./src/index.js"
+  },
+  "scripts": {
+    "analyze": "node src/analyze.js",
+    "convert": "node src/convert.js"
+  },
+  "dependencies": {
+    "@solidity-parser/parser": "^0.19.0"
+  },
+  "keywords": [
+    "solidity",
+    "named-arguments",
+    "refactoring"
+  ],
+  "license": "Apache-2.0"
+}

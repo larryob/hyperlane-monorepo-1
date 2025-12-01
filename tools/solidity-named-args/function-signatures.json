@@ -1,0 +1,65 @@
+{
+  "_comment": "Manual function signature mappings for external contracts and libraries",
+  "_usage": "Add entries here for functions that cannot be auto-resolved",
+  "_format": {
+    "FunctionName": {
+      "params": ["param1", "param2", "..."],
+      "description": "Optional description"
+    }
+  },
+
+  "Message.formatMessage": {
+    "params": ["version", "nonce", "localDomain", "sender", "destinationDomain", "recipientAddress", "messageBody"],
+    "description": "Format a Hyperlane message"
+  },
+
+  "TypeCasts.addressToBytes32": {
+    "params": ["addr"],
+    "description": "Convert address to bytes32"
+  },
+
+  "TypeCasts.bytes32ToAddress": {
+    "params": ["buf"],
+    "description": "Convert bytes32 to address"
+  },
+
+  "Address.isContract": {
+    "params": ["account"],
+    "description": "OpenZeppelin check if address is contract"
+  },
+
+  "abi.encodeCall": {
+    "params": ["functionSignature", "arguments"],
+    "description": "ABI encode function call"
+  },
+
+  "abi.decode": {
+    "params": ["encodedData", "types"],
+    "description": "ABI decode data"
+  },
+
+  "abi.encode": {
+    "params": ["value1", "value2", "value3", "value4", "value5", "value6", "value7", "value8"],
+    "description": "ABI encode values (variable args)"
+  },
+
+  "abi.encodePacked": {
+    "params": ["value1", "value2", "value3", "value4", "value5", "value6", "value7", "value8"],
+    "description": "ABI encode packed (variable args)"
+  },
+
+  "keccak256": {
+    "params": ["data"],
+    "description": "Compute keccak256 hash"
+  },
+
+  "__Ownable_init": {
+    "params": [],
+    "description": "OpenZeppelin Ownable initializer"
+  },
+
+  "transferOwnership": {
+    "params": ["newOwner"],
+    "description": "OpenZeppelin transfer ownership"
+  }
+}
