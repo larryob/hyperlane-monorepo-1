@@ -28,7 +28,7 @@ for file in "${CONTRACT_FILES[@]}"; do
         continue
     fi
 
-    contracts=$(grep -o '^contract [A-Za-z0-9_][A-Za-z0-9_]*' "$file" | sed 's/^contract //')
+    contracts=$(grep -o '^contract [A-Za-z0-9_][A-Za-z0-9_]*' "$file" | sed 's/^contract //' || true)
 
     if [ -z "$contracts" ]; then
         continue
