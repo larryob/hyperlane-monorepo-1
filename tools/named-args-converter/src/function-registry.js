@@ -1,0 +1,438 @@
+/**
+ * FunctionRegistry - Collects and indexes all function definitions from Solidity files
+ * 
+ * This module handles:
+ * - Contract/library/interface function definitions
+ * - Function overloading (multiple functions with same name but different parameters)
+ * - Constructor definitions
+ * - Event definitions
+ * - Custom error definitions
+ * - Modifier definitions
+ */
+
+import parser from '@solidity-parser/parser';
+import fs from 'fs';
+import path from 'path';
+import { glob } from 'glob';
+
+/**
+ * Creates a signature key for a function based on name and parameter count/types
+ */
+function createSignatureKey(name, params) {
+  if (!params || params.length === 0) return `${name}()`;
+  
+  const paramTypes = params.map(p => {
+    if (!p.typeName) return 'unknown';
+    return getTypeName(p.typeName);
+  }).join(',');
+  
+  return `${name}(${paramTypes})`;
+}
+
+/**
+ * Gets the type name from a TypeName AST node
+ */
+function getTypeName(typeName) {
+  if (!typeName) return 'unknown';
+  
+  switch (typeName.type) {
+    case 'ElementaryTypeName':
+      return typeName.name;
+    case 'UserDefinedTypeName':
+      return typeName.namePath;
+    case 'ArrayTypeName':
+      return `${getTypeName(typeName.baseTypeName)}[]`;
+    case 'Mapping':
+      return `mapping(${getTypeName(typeName.keyType)}=>${getTypeName(typeName.valueType)})`;
+    case 'FunctionTypeName':
+      return 'function';
+    default:
+      return 'unknown';
+  }
+}
+
+/**
+ * FunctionRegistry class for collecting and looking up function definitions
+ */
+export class FunctionRegistry {
+  constructor() {
+    // Map of contractName -> Map of functionName -> Array of {params, signature}
+    this.contracts = new Map();
+    // Map of functionName -> Array of {params, signature, contractName}
+    this.globalFunctions = new Map();
+    // Map of eventName -> Array of {params}
+    this.events = new Map();
+    // Map of errorName -> Array of {params}
+    this.errors = new Map();
+    // Map of modifierName -> Array of {params}
+    this.modifiers = new Map();
+    // Contract inheritance relationships
+    this.inheritance = new Map();
+    // Import mappings
+    this.imports = new Map();
+    // Parsed files cache
+    this.parsedFiles = new Map();
+    // Using-for declarations: type -> library functions
+    this.usingFor = new Map();
+  }
+
+  /**
+   * Parse a single Solidity file and register all functions
+   */
+  parseFile(filePath, source = null) {
+    try {
+      if (!source) {
+        source = fs.readFileSync(filePath, 'utf8');
+      }
+      
+      const ast = parser.parse(source, {
+        loc: true,
+        range: true,
+        tolerant: true
+      });
+      
+      this.parsedFiles.set(filePath, { source, ast });
+      this._processAST(ast, filePath);
+      
+      return ast;
+    } catch (error) {
+      console.error(`Error parsing ${filePath}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Parse all Solidity files in a directory
+   */
+  async parseDirectory(directory, pattern = '**/*.sol') {
+    const files = await glob(pattern, { cwd: directory, absolute: true });
+    
+    for (const file of files) {
+      this.parseFile(file);
+    }
+    
+    return files.length;
+  }
+
+  /**
+   * Process the AST and register all functions
+   */
+  _processAST(ast, filePath) {
+    if (!ast || !ast.children) return;
+    
+    for (const node of ast.children) {
+      switch (node.type) {
+        case 'ContractDefinition':
+          this._processContract(node, filePath);
+          break;
+        case 'ImportDirective':
+          this._processImport(node, filePath);
+          break;
+      }
+    }
+  }
+
+  /**
+   * Process a contract definition
+   */
+  _processContract(contract, filePath) {
+    const contractName = contract.name;
+    
+    if (!this.contracts.has(contractName)) {
+      this.contracts.set(contractName, new Map());
+    }
+    
+    // Record inheritance
+    if (contract.baseContracts && contract.baseContracts.length > 0) {
+      const baseNames = contract.baseContracts.map(bc => bc.baseName.namePath);
+      this.inheritance.set(contractName, baseNames);
+    }
+    
+    // Process sub-nodes
+    for (const node of contract.subNodes || []) {
+      switch (node.type) {
+        case 'FunctionDefinition':
+          this._registerFunction(contractName, node);
+          break;
+        case 'EventDefinition':
+          this._registerEvent(contractName, node);
+          break;
+        case 'CustomErrorDefinition':
+          this._registerError(contractName, node);
+          break;
+        case 'ModifierDefinition':
+          this._registerModifier(contractName, node);
+          break;
+        case 'UsingForDeclaration':
+          this._processUsingFor(contractName, node);
+          break;
+      }
+    }
+  }
+
+  /**
+   * Register a function definition
+   */
+  _registerFunction(contractName, funcDef) {
+    const funcName = funcDef.name || (funcDef.isConstructor ? 'constructor' : null);
+    if (!funcName) return;
+    
+    const params = funcDef.parameters || [];
+    const paramInfo = params.map(p => ({
+      name: p.name,
+      type: getTypeName(p.typeName),
+      typeName: p.typeName
+    }));
+    
+    const signature = createSignatureKey(funcName, params);
+    
+    const contractFuncs = this.contracts.get(contractName);
+    if (!contractFuncs.has(funcName)) {
+      contractFuncs.set(funcName, []);
+    }
+    
+    contractFuncs.get(funcName).push({
+      params: paramInfo,
+      signature,
+      isConstructor: funcDef.isConstructor,
+      visibility: funcDef.visibility,
+      loc: funcDef.loc,
+      range: funcDef.range
+    });
+    
+    // Also add to global functions for fallback lookup
+    if (!this.globalFunctions.has(funcName)) {
+      this.globalFunctions.set(funcName, []);
+    }
+    this.globalFunctions.get(funcName).push({
+      params: paramInfo,
+      signature,
+      contractName
+    });
+  }
+
+  /**
+   * Register an event definition
+   */
+  _registerEvent(contractName, eventDef) {
+    const eventName = eventDef.name;
+    const params = eventDef.parameters || [];
+    const paramInfo = params.map(p => ({
+      name: p.name,
+      type: getTypeName(p.typeName)
+    }));
+    
+    if (!this.events.has(eventName)) {
+      this.events.set(eventName, []);
+    }
+    this.events.get(eventName).push({
+      params: paramInfo,
+      contractName
+    });
+  }
+
+  /**
+   * Register a custom error definition
+   */
+  _registerError(contractName, errorDef) {
+    const errorName = errorDef.name;
+    const params = errorDef.parameters || [];
+    const paramInfo = params.map(p => ({
+      name: p.name,
+      type: getTypeName(p.typeName)
+    }));
+    
+    if (!this.errors.has(errorName)) {
+      this.errors.set(errorName, []);
+    }
+    this.errors.get(errorName).push({
+      params: paramInfo,
+      contractName
+    });
+  }
+
+  /**
+   * Register a modifier definition
+   */
+  _registerModifier(contractName, modDef) {
+    const modName = modDef.name;
+    const params = modDef.parameters || [];
+    const paramInfo = params.map(p => ({
+      name: p.name,
+      type: getTypeName(p.typeName)
+    }));
+    
+    if (!this.modifiers.has(modName)) {
+      this.modifiers.set(modName, []);
+    }
+    this.modifiers.get(modName).push({
+      params: paramInfo,
+      contractName
+    });
+  }
+
+  /**
+   * Process using-for declarations
+   */
+  _processUsingFor(contractName, usingFor) {
+    const libraryName = usingFor.libraryName;
+    const typeName = usingFor.typeName ? getTypeName(usingFor.typeName) : '*';
+    
+    if (!this.usingFor.has(contractName)) {
+      this.usingFor.set(contractName, new Map());
+    }
+    
+    const contractUsing = this.usingFor.get(contractName);
+    if (!contractUsing.has(typeName)) {
+      contractUsing.set(typeName, []);
+    }
+    contractUsing.get(typeName).push(libraryName);
+  }
+
+  /**
+   * Process import directive
+   */
+  _processImport(importNode, filePath) {
+    const importPath = importNode.path;
+    const dirPath = path.dirname(filePath);
+    
+    // Record symbol aliases
+    if (importNode.symbolAliases) {
+      for (const [symbol, alias] of importNode.symbolAliases) {
+        this.imports.set(alias || symbol, { symbol, importPath, filePath });
+      }
+    }
+    
+    if (importNode.unitAlias) {
+      this.imports.set(importNode.unitAlias, { importPath, filePath });
+    }
+  }
+
+  /**
+   * Look up a function by name and argument count within a contract context
+   */
+  lookupFunction(funcName, argCount, contractContext = null) {
+    // Check if it's a built-in that shouldn't be converted
+    if (this._isBuiltInSkip(funcName)) {
+      return null;
+    }
+    
+    // Try to find in specific contract
+    if (contractContext) {
+      const result = this._lookupInContract(funcName, argCount, contractContext);
+      if (result) return result;
+      
+      // Check inherited contracts
+      const bases = this.inheritance.get(contractContext);
+      if (bases) {
+        for (const base of bases) {
+          const result = this._lookupInContract(funcName, argCount, base);
+          if (result) return result;
+        }
+      }
+    }
+    
+    // Fallback to global search
+    const funcs = this.globalFunctions.get(funcName);
+    if (!funcs) return null;
+    
+    // Find best match by argument count
+    const matches = funcs.filter(f => f.params.length === argCount);
+    if (matches.length === 1) {
+      return matches[0];
+    } else if (matches.length > 1) {
+      // Multiple matches - return first one but mark as ambiguous
+      return { ...matches[0], ambiguous: true };
+    }
+    
+    return null;
+  }
+
+  /**
+   * Look up function in a specific contract
+   */
+  _lookupInContract(funcName, argCount, contractName) {
+    const contractFuncs = this.contracts.get(contractName);
+    if (!contractFuncs) return null;
+    
+    const funcs = contractFuncs.get(funcName);
+    if (!funcs) return null;
+    
+    const matches = funcs.filter(f => f.params.length === argCount);
+    if (matches.length === 1) {
+      return matches[0];
+    } else if (matches.length > 1) {
+      return { ...matches[0], ambiguous: true };
+    }
+    
+    return null;
+  }
+
+  /**
+   * Look up event by name and argument count
+   */
+  lookupEvent(eventName, argCount) {
+    const events = this.events.get(eventName);
+    if (!events) return null;
+    
+    const matches = events.filter(e => e.params.length === argCount);
+    return matches.length > 0 ? matches[0] : null;
+  }
+
+  /**
+   * Look up custom error by name and argument count
+   */
+  lookupError(errorName, argCount) {
+    const errors = this.errors.get(errorName);
+    if (!errors) return null;
+    
+    const matches = errors.filter(e => e.params.length === argCount);
+    return matches.length > 0 ? matches[0] : null;
+  }
+
+  /**
+   * Check if a function name is a built-in that should be skipped
+   */
+  _isBuiltInSkip(funcName) {
+    const builtIns = new Set([
+      // ABI encoding/decoding - these use positional args
+      'encode', 'encodePacked', 'encodeWithSelector', 'encodeWithSignature',
+      'encodeCall', 'decode',
+      // Type conversions
+      'address', 'uint256', 'uint128', 'uint64', 'uint32', 'uint16', 'uint8',
+      'int256', 'int128', 'int64', 'int32', 'int16', 'int8',
+      'bytes32', 'bytes', 'string', 'bool',
+      // Special built-ins
+      'require', 'revert', 'assert', 'keccak256', 'sha256', 'ripemd160',
+      'ecrecover', 'addmod', 'mulmod', 'blockhash', 'selfdestruct',
+      // Array operations
+      'push', 'pop',
+      // Low level
+      'call', 'delegatecall', 'staticcall'
+    ]);
+    
+    return builtIns.has(funcName);
+  }
+
+  /**
+   * Get statistics about the registry
+   */
+  getStats() {
+    let totalFunctions = 0;
+    for (const [_, funcs] of this.contracts) {
+      for (const [_, overloads] of funcs) {
+        totalFunctions += overloads.length;
+      }
+    }
+    
+    return {
+      contracts: this.contracts.size,
+      functions: totalFunctions,
+      events: this.events.size,
+      errors: this.errors.size,
+      modifiers: this.modifiers.size
+    };
+  }
+}
+
+export default FunctionRegistry;
