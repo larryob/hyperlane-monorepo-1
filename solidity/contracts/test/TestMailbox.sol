@@ -20,11 +20,11 @@ contract TestMailbox is Mailbox {
         bytes32 _recipient,
         bytes calldata _body
     ) external {
-        IMessageRecipient(_recipient.bytes32ToAddress()).handle(
-            _origin,
-            _sender,
-            _body
-        );
+        IMessageRecipient(_recipient.bytes32ToAddress()).handle({
+            _origin: _origin,
+            _sender: _sender,
+            _message: _body
+        });
     }
 
     function buildOutboundMessage(

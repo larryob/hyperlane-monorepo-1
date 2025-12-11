@@ -291,11 +291,11 @@ abstract contract TokenRouter is GasRouter, ITokenBridge {
             return (_feeRecipient, 0);
         }
 
-        Quote[] memory quotes = ITokenFee(_feeRecipient).quoteTransferRemote(
-            _destination,
-            _recipient,
-            _amount
-        );
+        Quote[] memory quotes = ITokenFee(_feeRecipient).quoteTransferRemote({
+            _destination: _destination,
+            _recipient: _recipient,
+            _amount: _amount
+        });
         if (quotes.length == 0) {
             return (_feeRecipient, 0);
         }

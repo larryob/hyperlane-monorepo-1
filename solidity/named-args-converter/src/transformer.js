@@ -407,12 +407,30 @@ export class Transformer {
     let funcDef = null;
     let resolvedFromType = false;
 
-    // For member access calls, try to resolve the type from state variables
+    // For member access calls, try to resolve the type
     if (isMemberAccess) {
-      const varName = node.expression.expression?.name;
-      if (varName && this.variableTypes && this.variableTypes.has(varName)) {
-        contractContext = this.variableTypes.get(varName);
-        resolvedFromType = true;
+      const baseExpr = node.expression.expression;
+
+      // Case 1: Simple identifier (e.g., mailbox.dispatch(...))
+      if (baseExpr?.type === 'Identifier') {
+        const varName = baseExpr.name;
+        if (this.variableTypes && this.variableTypes.has(varName)) {
+          contractContext = this.variableTypes.get(varName);
+          resolvedFromType = true;
+        }
+      }
+
+      // Case 2: Type cast (e.g., IContract(address).method(...))
+      if (baseExpr?.type === 'FunctionCall' && baseExpr.expression) {
+        // Check if it's a type cast to a user-defined type
+        if (baseExpr.expression.type === 'Identifier') {
+          const typeName = baseExpr.expression.name;
+          // If it starts with uppercase, it's likely a type cast
+          if (typeName && typeName[0] === typeName[0].toUpperCase()) {
+            contractContext = typeName;
+            resolvedFromType = true;
+          }
+        }
       }
     }
 

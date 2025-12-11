@@ -81,20 +81,20 @@ contract MockCircleMessageTransmitter is
 
         if (version == 0) {
             // V1: Call handleReceiveMessage
-            success = IMessageHandler(recipient).handleReceiveMessage(
-                sourceDomain,
-                sender,
-                messageBody
-            );
+            success = IMessageHandler(recipient).handleReceiveMessage({
+                sourceDomain: sourceDomain,
+                sender: sender,
+                messageBody: messageBody
+            });
         } else {
             // V2: Call handleReceiveUnfinalizedMessage
             success = IMessageHandlerV2(recipient)
-                .handleReceiveUnfinalizedMessage(
-                    sourceDomain,
-                    sender,
-                    1000, // mock finality threshold
-                    messageBody
-                );
+                .handleReceiveUnfinalizedMessage({
+                    sourceDomain: sourceDomain,
+                    sender: sender,
+                    finalityThresholdExecuted: 1000,
+                    messageBody: messageBody
+                });
         }
     }
 

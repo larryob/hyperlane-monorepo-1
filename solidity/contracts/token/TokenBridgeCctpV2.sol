@@ -166,13 +166,13 @@ contract TokenBridgeCctpV2 is TokenBridgeCctpBase, IMessageHandlerV2 {
         bytes32 ism,
         bytes32 messageId
     ) internal override {
-        IMessageTransmitterV2(address(messageTransmitter)).sendMessage(
-            destinationDomain,
-            ism,
-            ism,
-            minFinalityThreshold,
-            abi.encode(messageId)
-        );
+        IMessageTransmitterV2(address(messageTransmitter)).sendMessage({
+            destinationDomain: destinationDomain,
+            recipient: ism,
+            destinationCaller: ism,
+            minFinalityThreshold: minFinalityThreshold,
+            messageBody: abi.encode(messageId)
+        });
     }
 
     function _bridgeViaCircle(
@@ -182,14 +182,14 @@ contract TokenBridgeCctpV2 is TokenBridgeCctpBase, IMessageHandlerV2 {
         uint256 _maxFee,
         bytes32 _ism
     ) internal override {
-        ITokenMessengerV2(address(tokenMessenger)).depositForBurn(
-            _amount,
-            circleDomain,
-            _recipient,
-            address(wrappedToken),
-            _ism,
-            _maxFee,
-            minFinalityThreshold
-        );
+        ITokenMessengerV2(address(tokenMessenger)).depositForBurn({
+            amount: _amount,
+            destinationDomain: circleDomain,
+            mintRecipient: _recipient,
+            burnToken: address(wrappedToken),
+            destinationCaller: _ism,
+            maxFee: _maxFee,
+            minFinalityThreshold: minFinalityThreshold
+        });
     }
 }
