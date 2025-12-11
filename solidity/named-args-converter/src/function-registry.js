@@ -314,8 +314,17 @@ export class FunctionRegistry {
 
   /**
    * Look up a function by name and argument count within a contract context
+   * @param {string} funcName - Function name to look up
+   * @param {number} argCount - Number of arguments
+   * @param {string|null} contractContext - Contract name to search in
+   * @param {boolean} allowGlobalFallback - Whether to fall back to global search (default: true)
    */
-  lookupFunction(funcName, argCount, contractContext = null) {
+  lookupFunction(
+    funcName,
+    argCount,
+    contractContext = null,
+    allowGlobalFallback = true,
+  ) {
     // Check if it's a built-in that shouldn't be converted
     if (this._isBuiltInSkip(funcName)) {
       return null;
@@ -338,6 +347,12 @@ export class FunctionRegistry {
           if (result) return result;
         }
       }
+
+      // If contract context was provided but not found, don't fall back to global
+      // unless explicitly allowed (this prevents mismatched parameter names)
+      if (!allowGlobalFallback) {
+        return null;
+      }
     }
 
     // Fallback to global search
@@ -346,14 +361,22 @@ export class FunctionRegistry {
 
     // Find best match by argument count
     const matches = funcs.filter((f) => f.params.length === argCount);
-    if (matches.length === 1) {
-      return matches[0];
-    } else if (matches.length > 1) {
-      // Multiple matches - return first one but mark as ambiguous
-      return { ...matches[0], ambiguous: true };
+    if (matches.length === 0) {
+      return null;
     }
 
-    return null;
+    // Check if all matches have the same parameter names
+    const firstParamNames = matches[0].params.map((p) => p.name).join(',');
+    const allSameParams = matches.every(
+      (m) => m.params.map((p) => p.name).join(',') === firstParamNames,
+    );
+
+    if (matches.length === 1 || allSameParams) {
+      return matches[0];
+    } else {
+      // Multiple matches with different parameter names - ambiguous
+      return { ...matches[0], ambiguous: true };
+    }
   }
 
   /**

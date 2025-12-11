@@ -139,11 +139,11 @@ contract TokenBridgeCctpV2 is TokenBridgeCctpBase, IMessageHandlerV2 {
         bytes calldata messageBody
     ) external override returns (bool) {
         return
-            _receiveMessageId(
-                sourceDomain,
-                sender,
-                abi.decode(messageBody, (bytes32))
-            );
+            _receiveMessageId({
+                circleSource: sourceDomain,
+                circleSender: sender,
+                messageId: abi.decode(messageBody, (bytes32))
+            });
     }
 
     // @inheritdoc IMessageHandlerV2
@@ -154,11 +154,11 @@ contract TokenBridgeCctpV2 is TokenBridgeCctpBase, IMessageHandlerV2 {
         bytes calldata messageBody
     ) external override returns (bool) {
         return
-            _receiveMessageId(
-                sourceDomain,
-                sender,
-                abi.decode(messageBody, (bytes32))
-            );
+            _receiveMessageId({
+                circleSource: sourceDomain,
+                circleSender: sender,
+                messageId: abi.decode(messageBody, (bytes32))
+            });
     }
 
     function _sendMessageIdToIsm(

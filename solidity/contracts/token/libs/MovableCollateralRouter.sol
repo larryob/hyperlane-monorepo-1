@@ -158,7 +158,12 @@ abstract contract MovableCollateralRouter is TokenRouter {
             recipient,
             collateralAmount
         );
-        emit CollateralMoved(domain, recipient, collateralAmount, msg.sender);
+        emit CollateralMoved({
+            domain: domain,
+            recipient: recipient,
+            amount: collateralAmount,
+            rebalancer: msg.sender
+        });
     }
 
     function _recipient(

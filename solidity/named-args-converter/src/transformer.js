@@ -306,28 +306,46 @@ export class Transformer {
       return;
     }
 
+    // Determine if this is a member access call (e.g., foo.bar(...))
+    const isMemberAccess = node.expression.type === 'MemberAccess';
+
     // Try to find the function definition
     let contractContext = getContractContext(node.expression);
     let funcDef = null;
+    let resolvedFromType = false;
 
     // For member access calls, try to resolve the type from state variables
-    if (node.expression.type === 'MemberAccess') {
+    if (isMemberAccess) {
       const varName = node.expression.expression?.name;
       if (varName && this.variableTypes && this.variableTypes.has(varName)) {
         contractContext = this.variableTypes.get(varName);
+        resolvedFromType = true;
       }
     }
 
-    // Try specific contract first, then fallback
+    // Try specific contract first
+    // For member access calls, don't allow global fallback to prevent wrong param names
     if (contractContext) {
       funcDef = this.registry.lookupFunction(
         funcName,
         node.arguments.length,
         contractContext,
+        !isMemberAccess, // allowGlobalFallback: false for member access
       );
     }
 
-    // Fallback to current contract context
+    // For member access calls, if we couldn't resolve the type, skip conversion
+    // This prevents mismatched parameter names from external libraries
+    if (isMemberAccess && !funcDef) {
+      if (this.options.verbose) {
+        console.log(
+          `Skipping member access call ${funcName}() - couldn't resolve type`,
+        );
+      }
+      return;
+    }
+
+    // Fallback to current contract context (only for non-member-access calls)
     if (!funcDef && currentContract) {
       funcDef = this.registry.lookupFunction(
         funcName,
@@ -336,7 +354,7 @@ export class Transformer {
       );
     }
 
-    // Global fallback
+    // Global fallback (only for non-member-access calls)
     if (!funcDef) {
       funcDef = this.registry.lookupFunction(
         funcName,
@@ -394,15 +412,25 @@ export class Transformer {
   _createChange(node, source, funcName, paramNames) {
     if (!node.range) return;
 
-    // Find the opening parenthesis after the function name
     const callStart = node.range[0];
     const callEnd = node.range[1];
 
     // Get the original call text
     const originalText = source.substring(callStart, callEnd + 1);
 
-    // Find where arguments start (after the opening parenthesis)
-    const parenIndex = originalText.indexOf('(');
+    // For member access calls like `foo().bar(args)`, we need to find the opening
+    // parenthesis for THIS call's arguments, not a nested call's parenthesis.
+    // Use the first argument's position to find the correct opening paren.
+    let parenIndex;
+    if (node.arguments.length > 0 && node.arguments[0].range) {
+      // Find the '(' that comes just before the first argument
+      const firstArgStart = node.arguments[0].range[0];
+      const textBeforeFirstArg = source.substring(callStart, firstArgStart);
+      parenIndex = textBeforeFirstArg.lastIndexOf('(');
+    } else {
+      // Fallback for no-argument calls (shouldn't happen given our filters)
+      parenIndex = originalText.indexOf('(');
+    }
     if (parenIndex === -1) return;
 
     // Get the function expression part
@@ -451,8 +479,14 @@ export class Transformer {
    * Apply all collected changes to the source
    */
   _applyChanges(source) {
+    // Filter out nested calls - if a call is contained within another call we're converting,
+    // skip it to avoid position corruption after replacement
+    const filteredChanges = this._filterNestedCalls(this.changes);
+
     // Sort changes by start position in reverse order
-    const sortedChanges = [...this.changes].sort((a, b) => b.start - a.start);
+    const sortedChanges = [...filteredChanges].sort(
+      (a, b) => b.start - a.start,
+    );
 
     let result = source;
     for (const change of sortedChanges) {
@@ -463,6 +497,49 @@ export class Transformer {
     }
 
     return result;
+  }
+
+  /**
+   * Filter out overlapping function calls to avoid position corruption
+   * When two calls overlap (one contains another, or they share ranges),
+   * we can only safely convert non-overlapping calls.
+   *
+   * Strategy: For overlapping calls, keep the innermost (smallest range) one,
+   * as it's the most specific and least likely to affect other positions.
+   */
+  _filterNestedCalls(changes) {
+    if (changes.length <= 1) return changes;
+
+    const toRemove = new Set();
+
+    // Check each pair of changes for overlap
+    for (let i = 0; i < changes.length; i++) {
+      if (toRemove.has(i)) continue;
+      const call1 = changes[i];
+      const size1 = call1.end - call1.start;
+
+      for (let j = i + 1; j < changes.length; j++) {
+        if (toRemove.has(j)) continue;
+        const call2 = changes[j];
+        const size2 = call2.end - call2.start;
+
+        // Check if ranges overlap
+        const overlaps = !(
+          call1.end <= call2.start || call2.end <= call1.start
+        );
+
+        if (overlaps) {
+          // Remove the larger one (keep the more specific/inner call)
+          if (size1 >= size2) {
+            toRemove.add(i);
+          } else {
+            toRemove.add(j);
+          }
+        }
+      }
+    }
+
+    return changes.filter((_, i) => !toRemove.has(i));
   }
 
   /**

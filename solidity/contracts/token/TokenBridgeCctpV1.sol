@@ -81,11 +81,11 @@ contract TokenBridgeCctpV1 is TokenBridgeCctpBase, IMessageHandler {
         bytes calldata body
     ) external override returns (bool) {
         return
-            _receiveMessageId(
-                sourceDomain,
-                sender,
-                abi.decode(body, (bytes32))
-            );
+            _receiveMessageId({
+                circleSource: sourceDomain,
+                circleSender: sender,
+                messageId: abi.decode(body, (bytes32))
+            });
     }
 
     function _sendMessageIdToIsm(

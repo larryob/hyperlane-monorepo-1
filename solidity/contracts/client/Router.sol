@@ -101,7 +101,7 @@ abstract contract Router is MailboxClient, IMessageRecipient {
     ) external payable virtual override onlyMailbox {
         bytes32 _router = _mustHaveRemoteRouter(_origin);
         require(_router == _sender, "Enrolled router does not match sender");
-        _handle(_origin, _sender, _message);
+        _handle({_origin: _origin, _sender: _sender, _message: _message});
     }
 
     // ============ Virtual functions ============
@@ -176,13 +176,13 @@ abstract contract Router is MailboxClient, IMessageRecipient {
         bytes memory _messageBody
     ) internal returns (bytes32) {
         return
-            _Router_dispatch(
-                _destinationDomain,
-                _value,
-                _messageBody,
-                "",
-                address(hook)
-            );
+            _Router_dispatch({
+                _destinationDomain: _destinationDomain,
+                _value: _value,
+                _messageBody: _messageBody,
+                _hookMetadata: "",
+                _hook: address(hook)
+            });
     }
 
     function _Router_dispatch(
@@ -208,12 +208,12 @@ abstract contract Router is MailboxClient, IMessageRecipient {
         bytes memory _messageBody
     ) internal view returns (uint256) {
         return
-            _Router_quoteDispatch(
-                _destinationDomain,
-                _messageBody,
-                "",
-                address(hook)
-            );
+            _Router_quoteDispatch({
+                _destinationDomain: _destinationDomain,
+                _messageBody: _messageBody,
+                _hookMetadata: "",
+                _hook: address(hook)
+            });
     }
 
     function _Router_quoteDispatch(

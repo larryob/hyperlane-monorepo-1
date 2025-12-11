@@ -208,6 +208,9 @@ node src/test.js
 2. **Requires function definitions**: Can't convert calls to unknown functions
 3. **No semantic analysis**: Doesn't verify type compatibility
 4. **Single-file scope**: Each file is transformed independently
+5. **Nested/chained calls**: When function calls are nested (e.g., `foo(bar(x))`) or chained (e.g., `a().b()`), only the innermost call is converted to avoid position corruption
+6. **External library calls**: Member access calls (e.g., `vault.withdraw(...)`) are only converted if the object's type can be resolved to a known contract and the function is found in that contract's definition. Calls to external libraries like OpenZeppelin are typically skipped.
+7. **Type resolution**: Variable types are only tracked for simple declarations. Complex type inference (e.g., return types of function calls, storage mappings) is not supported.
 
 ## License
 
