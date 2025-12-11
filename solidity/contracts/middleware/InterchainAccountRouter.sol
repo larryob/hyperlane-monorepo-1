@@ -785,19 +785,19 @@ contract InterchainAccountRouter is Router, AbstractRoutingIsm {
         });
         emit CommitRevealDispatched(_commitment);
 
-        _commitmentMsgId = _dispatchMessageWithValue(
-            _destination,
-            _router,
-            _commitmentMsg,
-            StandardHookMetadata.formatMetadata({
+        _commitmentMsgId = _dispatchMessageWithValue({
+            _destination: _destination,
+            _router: _router,
+            _body: _commitmentMsg,
+            _hookMetadata: StandardHookMetadata.formatMetadata({
                 _msgValue: 0,
                 _gasLimit: COMMIT_TX_GAS_USAGE,
                 _refundAddress: address(this),
                 _customMetadata: bytes("")
             }),
-            _hook,
-            msg.value
-        );
+            _hook: _hook,
+            _value: msg.value
+        });
 
         bytes memory _revealMsg = InterchainAccountMessage.encodeReveal({
             _ism: _ccipReadIsm,

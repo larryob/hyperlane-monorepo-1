@@ -224,12 +224,12 @@ abstract contract Router is MailboxClient, IMessageRecipient {
     ) internal view returns (uint256) {
         bytes32 _router = _mustHaveRemoteRouter(_destinationDomain);
         return
-            mailbox.quoteDispatch(
-                _destinationDomain,
-                _router,
-                _messageBody,
-                _hookMetadata,
-                IPostDispatchHook(_hook)
-            );
+            mailbox.quoteDispatch({
+                destinationDomain: _destinationDomain,
+                recipientAddress: _router,
+                messageBody: _messageBody,
+                customHookMetadata: _hookMetadata,
+                customHook: IPostDispatchHook(_hook)
+            });
     }
 }
