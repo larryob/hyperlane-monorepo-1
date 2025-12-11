@@ -73,6 +73,12 @@ function shouldSkipCall(node, funcName) {
     return true;
   }
 
+  // Skip calls with {value: ...} or {gas: ...} options
+  // These use curly brace syntax for a different purpose
+  if (node.expression && node.expression.type === 'NameValueExpression') {
+    return true;
+  }
+
   // Skip ABI calls
   if (node.expression && node.expression.type === 'MemberAccess') {
     const base = node.expression.expression;
@@ -233,8 +239,10 @@ export class Transformer {
     parser.visit(ast, {
       ContractDefinition(node) {
         currentContract = node.name;
-        // Reset variable types for each contract
-        self.variableTypes = new Map();
+        // Initialize with inherited state variables from registry
+        self.variableTypes = new Map(
+          self.registry.getStateVariables(node.name),
+        );
       },
       'ContractDefinition:exit'() {
         currentContract = null;
@@ -242,6 +250,7 @@ export class Transformer {
       },
       StateVariableDeclaration(node) {
         // Track state variable types (e.g., IExternal ext;)
+        // These are also in the registry but we track locally for completeness
         if (node.variables) {
           for (const variable of node.variables) {
             if (variable.name && variable.typeName) {

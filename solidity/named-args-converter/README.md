@@ -210,7 +210,8 @@ node src/test.js
 4. **Single-file scope**: Each file is transformed independently
 5. **Nested/chained calls**: When function calls are nested (e.g., `foo(bar(x))`) or chained (e.g., `a().b()`), only the innermost call is converted to avoid position corruption
 6. **External library calls**: Member access calls (e.g., `vault.withdraw(...)`) are only converted if the object's type can be resolved to a known contract and the function is found in that contract's definition. Calls to external libraries like OpenZeppelin are typically skipped.
-7. **Type resolution**: Variable types are only tracked for simple declarations. Complex type inference (e.g., return types of function calls, storage mappings) is not supported.
+7. **Type resolution**: Variable types are tracked for state variables (including inherited) and local declarations. Complex type inference (e.g., return types of function calls, storage mappings) is not supported.
+8. **Value/gas options**: Calls with `{value: ...}` or `{gas: ...}` options (e.g., `target.call{value: 1 ether}(...)`) are skipped since they already use curly brace syntax for a different purpose.
 
 ## License
 

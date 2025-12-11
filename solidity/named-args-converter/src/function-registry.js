@@ -75,6 +75,8 @@ export class FunctionRegistry {
     this.parsedFiles = new Map();
     // Using-for declarations: type -> library functions
     this.usingFor = new Map();
+    // Map of contractName -> Map of varName -> typeName (state variables)
+    this.stateVariables = new Map();
   }
 
   /**
@@ -143,6 +145,10 @@ export class FunctionRegistry {
       this.contracts.set(contractName, new Map());
     }
 
+    if (!this.stateVariables.has(contractName)) {
+      this.stateVariables.set(contractName, new Map());
+    }
+
     // Record inheritance
     if (contract.baseContracts && contract.baseContracts.length > 0) {
       const baseNames = contract.baseContracts.map(
@@ -169,8 +175,56 @@ export class FunctionRegistry {
         case 'UsingForDeclaration':
           this._processUsingFor(contractName, node);
           break;
+        case 'StateVariableDeclaration':
+          this._registerStateVariables(contractName, node);
+          break;
       }
     }
+  }
+
+  /**
+   * Register state variables for a contract
+   */
+  _registerStateVariables(contractName, stateVarDecl) {
+    const contractVars = this.stateVariables.get(contractName);
+    if (!contractVars) return;
+
+    for (const variable of stateVarDecl.variables || []) {
+      if (variable.name && variable.typeName) {
+        const typeName = getTypeName(variable.typeName);
+        if (typeName) {
+          contractVars.set(variable.name, typeName);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get all state variables for a contract, including inherited ones
+   */
+  getStateVariables(contractName) {
+    const result = new Map();
+
+    // First add inherited variables (so they can be overridden by child)
+    const bases = this.inheritance.get(contractName);
+    if (bases) {
+      for (const base of bases) {
+        const baseVars = this.getStateVariables(base);
+        for (const [name, type] of baseVars) {
+          result.set(name, type);
+        }
+      }
+    }
+
+    // Then add this contract's variables
+    const contractVars = this.stateVariables.get(contractName);
+    if (contractVars) {
+      for (const [name, type] of contractVars) {
+        result.set(name, type);
+      }
+    }
+
+    return result;
   }
 
   /**
