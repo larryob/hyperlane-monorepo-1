@@ -211,7 +211,7 @@ Make sure to run `forge build` before using the converter to ensure artifacts ar
 ## Limitations
 
 1. **Source-level transformation**: Works on source code, not compiled bytecode
-2. **Requires function definitions**: Can't convert calls to unknown functions (use Foundry artifacts or `--include`)
+2. **Requires function definitions**: Can't convert calls to unknown functions (run `forge build` first to generate Foundry artifacts)
 3. **No semantic analysis**: Doesn't verify type compatibility
 4. **Single-file scope**: Each file is transformed independently
 5. **Nested/chained calls**: When function calls are nested (e.g., `foo(bar(x))`) or chained (e.g., `a().b()`), only the innermost call is converted to avoid position corruption

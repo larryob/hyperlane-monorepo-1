@@ -64,13 +64,6 @@ const argv = yargs(hideBin(process.argv))
     description: 'Patterns to exclude',
     default: ['**/node_modules/**', '**/lib/**', '**/forge-std/**'],
   })
-  .option('include', {
-    alias: 'i',
-    type: 'array',
-    description:
-      'Additional paths to parse for function definitions (e.g., node_modules interfaces)',
-    default: [],
-  })
   .option('show-diff', {
     type: 'boolean',
     description: 'Show diff of changes',
@@ -123,7 +116,6 @@ async function main() {
     verbose: argv.verbose,
     write: argv.write,
     excludePatterns: argv.exclude,
-    includePaths: argv.include,
   });
 
   console.log('Solidity Named Arguments Converter');
