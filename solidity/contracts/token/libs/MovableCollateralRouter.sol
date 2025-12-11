@@ -153,11 +153,11 @@ abstract contract MovableCollateralRouter is TokenRouter {
             revert("Rebalance native fee exceeds balance");
         }
 
-        bridge.transferRemote{value: nativeFees}(
-            domain,
-            recipient,
-            collateralAmount
-        );
+        bridge.transferRemote{value: nativeFees}({
+            _destination: domain,
+            _recipient: recipient,
+            _amount: collateralAmount
+        });
         emit CollateralMoved({
             domain: domain,
             recipient: recipient,

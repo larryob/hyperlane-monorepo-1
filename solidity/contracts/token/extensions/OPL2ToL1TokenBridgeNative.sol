@@ -110,11 +110,11 @@ contract OpL2NativeTokenBridge is TokenRouter {
         );
 
         // 4. "Dispatch" the message by calling the L2 bridge to transfer native tokens
-        l2Bridge.bridgeETHTo{value: _amount}(
-            _recipient.bytes32ToAddress(),
-            OP_MIN_GAS_LIMIT_ON_L1,
-            extraData
-        );
+        l2Bridge.bridgeETHTo{value: _amount}({
+            _to: _recipient.bytes32ToAddress(),
+            _minGasLimit: OP_MIN_GAS_LIMIT_ON_L1,
+            _extraData: extraData
+        });
 
         if (address(this).balance > 0) {
             payable(msg.sender).sendValue(address(this).balance);

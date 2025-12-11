@@ -14,6 +14,11 @@ import parser from '@solidity-parser/parser';
 function getFunctionName(expression) {
   if (!expression) return null;
 
+  // Unwrap NameValueExpression (e.g., dispatch{value: x}(...))
+  if (expression.type === 'NameValueExpression') {
+    return getFunctionName(expression.expression);
+  }
+
   switch (expression.type) {
     case 'Identifier':
       return expression.name;
@@ -38,6 +43,11 @@ function getFunctionName(expression) {
  */
 function getContractContext(expression) {
   if (!expression) return null;
+
+  // Unwrap NameValueExpression (e.g., dispatch{value: x}(...))
+  if (expression.type === 'NameValueExpression') {
+    return getContractContext(expression.expression);
+  }
 
   if (expression.type === 'MemberAccess') {
     const base = expression.expression;
@@ -73,11 +83,8 @@ function shouldSkipCall(node, funcName) {
     return true;
   }
 
-  // Skip calls with {value: ...} or {gas: ...} options
-  // These use curly brace syntax for a different purpose
-  if (node.expression && node.expression.type === 'NameValueExpression') {
-    return true;
-  }
+  // Note: Calls with {value: ...} or {gas: ...} options CAN be converted
+  // The value/gas syntax is separate from the function arguments
 
   // Skip ABI calls
   if (node.expression && node.expression.type === 'MemberAccess') {
@@ -396,8 +403,15 @@ export class Transformer {
       return;
     }
 
+    // Unwrap NameValueExpression to get the actual expression
+    // (e.g., dispatch{value: x}(...) -> dispatch)
+    let actualExpression = node.expression;
+    if (actualExpression.type === 'NameValueExpression') {
+      actualExpression = actualExpression.expression;
+    }
+
     // Determine if this is a member access call (e.g., foo.bar(...))
-    const isMemberAccess = node.expression.type === 'MemberAccess';
+    const isMemberAccess = actualExpression.type === 'MemberAccess';
 
     // Infer argument types for overload disambiguation
     const argTypes = this._inferArgumentTypes(node.arguments);
@@ -409,7 +423,7 @@ export class Transformer {
 
     // For member access calls, try to resolve the type
     if (isMemberAccess) {
-      const baseExpr = node.expression.expression;
+      const baseExpr = actualExpression.expression;
 
       // Case 1: Simple identifier (e.g., mailbox.dispatch(...))
       if (baseExpr?.type === 'Identifier') {

@@ -242,11 +242,11 @@ contract Mailbox is
         );
 
         // Deliver the message to the recipient.
-        IMessageRecipient(recipient).handle{value: msg.value}(
-            _message.origin(),
-            _message.sender(),
-            _message.body()
-        );
+        IMessageRecipient(recipient).handle{value: msg.value}({
+            _origin: _message.origin(),
+            _sender: _message.sender(),
+            _message: _message.body()
+        });
     }
 
     /**

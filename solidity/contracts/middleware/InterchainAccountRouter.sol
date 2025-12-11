@@ -1020,13 +1020,13 @@ contract InterchainAccountRouter is Router, AbstractRoutingIsm {
     ) private returns (bytes32) {
         require(_router != bytes32(0), "no router specified for destination");
         return
-            mailbox.dispatch{value: _value}(
-                _destination,
-                _router,
-                _body,
-                _hookMetadata,
-                _hook
-            );
+            mailbox.dispatch{value: _value}({
+                destinationDomain: _destination,
+                recipientAddress: _router,
+                body: _body,
+                customHookMetadata: _hookMetadata,
+                customHook: _hook
+            });
     }
 
     /**

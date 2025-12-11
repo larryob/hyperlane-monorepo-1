@@ -194,13 +194,13 @@ abstract contract Router is MailboxClient, IMessageRecipient {
     ) internal returns (bytes32) {
         bytes32 _router = _mustHaveRemoteRouter(_destinationDomain);
         return
-            mailbox.dispatch{value: _value}(
-                _destinationDomain,
-                _router,
-                _messageBody,
-                _hookMetadata,
-                IPostDispatchHook(_hook)
-            );
+            mailbox.dispatch{value: _value}({
+                destinationDomain: _destinationDomain,
+                recipientAddress: _router,
+                body: _messageBody,
+                customHookMetadata: _hookMetadata,
+                customHook: IPostDispatchHook(_hook)
+            });
     }
 
     function _Router_quoteDispatch(
