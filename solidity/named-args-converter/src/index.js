@@ -32,6 +32,7 @@ export class NamedArgsConverter {
         '**/node_modules/**',
         '**/lib/**',
       ],
+      includePaths: options.includePaths || [],
       ...options,
     };
 
@@ -92,6 +93,49 @@ export class NamedArgsConverter {
 
     // First pass: Build complete registry
     console.log('Pass 1: Building function registry...');
+
+    // Parse additional include paths first (e.g., node_modules interfaces)
+    if (this.options.includePaths && this.options.includePaths.length > 0) {
+      for (const includePath of this.options.includePaths) {
+        const absoluteInclude = path.resolve(includePath);
+        try {
+          const stat = fs.statSync(absoluteInclude);
+          if (stat.isDirectory()) {
+            // Glob for .sol files in the directory
+            const includeFiles = await glob('**/*.sol', {
+              cwd: absoluteInclude,
+              absolute: true,
+            });
+            for (const file of includeFiles) {
+              try {
+                const source = fs.readFileSync(file, 'utf8');
+                this.registry.parseFile(file, source);
+              } catch (error) {
+                if (this.options.verbose) {
+                  console.error(
+                    `Error parsing include ${file}:`,
+                    error.message,
+                  );
+                }
+              }
+            }
+          } else {
+            // Single file
+            const source = fs.readFileSync(absoluteInclude, 'utf8');
+            this.registry.parseFile(absoluteInclude, source);
+          }
+        } catch (error) {
+          if (this.options.verbose) {
+            console.error(
+              `Error with include path ${includePath}:`,
+              error.message,
+            );
+          }
+        }
+      }
+    }
+
+    // Parse main target files
     for (const file of files) {
       try {
         const source = fs.readFileSync(file, 'utf8');
