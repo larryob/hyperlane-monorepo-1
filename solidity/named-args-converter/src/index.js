@@ -94,7 +94,17 @@ export class NamedArgsConverter {
     // First pass: Build complete registry
     console.log('Pass 1: Building function registry...');
 
-    // Parse additional include paths first (e.g., node_modules interfaces)
+    // Auto-detect and parse Foundry artifacts from out/ directory
+    // This provides function definitions for all compiled contracts including external deps
+    const outDir = path.join(directory, '..', 'out');
+    if (fs.existsSync(outDir)) {
+      const artifactCount = await this.registry.parseFoundryArtifacts(outDir);
+      if (this.options.verbose) {
+        console.log(`Loaded ${artifactCount} contracts from Foundry artifacts`);
+      }
+    }
+
+    // Parse additional include paths (e.g., node_modules interfaces) - usually not needed with artifacts
     if (this.options.includePaths && this.options.includePaths.length > 0) {
       for (const includePath of this.options.includePaths) {
         const absoluteInclude = path.resolve(includePath);

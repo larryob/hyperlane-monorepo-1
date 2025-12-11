@@ -295,7 +295,11 @@ contract XERC20LockboxTest is IXERC20Lockbox {
     }
 
     function depositTo(address _user, uint256 _amount) public {
-        ERC20.transferFrom(msg.sender, address(this), _amount);
+        ERC20.transferFrom({
+            from: msg.sender,
+            to: address(this),
+            amount: _amount
+        });
         XERC20.mint(_user, _amount);
     }
 

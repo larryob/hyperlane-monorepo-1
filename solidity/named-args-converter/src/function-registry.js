@@ -118,6 +118,130 @@ export class FunctionRegistry {
   }
 
   /**
+   * Parse Foundry build artifacts from out/ directory
+   * This extracts function definitions from compiled ABIs
+   */
+  async parseFoundryArtifacts(outDirectory) {
+    const artifactFiles = await glob('**/*.json', {
+      cwd: outDirectory,
+      absolute: true,
+    });
+
+    let contractCount = 0;
+    for (const file of artifactFiles) {
+      try {
+        const content = fs.readFileSync(file, 'utf8');
+        const artifact = JSON.parse(content);
+
+        if (!artifact.abi || !Array.isArray(artifact.abi)) {
+          continue;
+        }
+
+        // Extract contract name from file path (e.g., out/IOutbox.sol/IOutbox.json -> IOutbox)
+        const contractName = path.basename(file, '.json');
+
+        this._registerArtifactABI(contractName, artifact.abi);
+        contractCount++;
+      } catch (error) {
+        // Skip files that can't be parsed
+      }
+    }
+
+    return contractCount;
+  }
+
+  /**
+   * Register functions and events from an ABI
+   */
+  _registerArtifactABI(contractName, abi) {
+    if (!this.contracts.has(contractName)) {
+      this.contracts.set(contractName, new Map());
+    }
+
+    for (const item of abi) {
+      if (item.type === 'function') {
+        this._registerArtifactFunction(contractName, item);
+      } else if (item.type === 'event') {
+        this._registerArtifactEvent(contractName, item);
+      }
+    }
+  }
+
+  /**
+   * Register a function from an ABI item
+   */
+  _registerArtifactFunction(contractName, funcItem) {
+    const funcName = funcItem.name;
+    if (!funcName) return;
+
+    const params = (funcItem.inputs || []).map((input) => ({
+      name: input.name,
+      type: input.type,
+    }));
+
+    // Skip if any parameter is unnamed
+    if (params.some((p) => !p.name)) return;
+
+    const signature = `${funcName}(${params.map((p) => p.type).join(',')})`;
+
+    const contractFuncs = this.contracts.get(contractName);
+    if (!contractFuncs.has(funcName)) {
+      contractFuncs.set(funcName, []);
+    }
+
+    // Check if this exact signature already exists
+    const existing = contractFuncs.get(funcName);
+    if (!existing.some((f) => f.signature === signature)) {
+      existing.push({
+        params,
+        signature,
+        fromArtifact: true,
+      });
+
+      // Also add to global functions
+      if (!this.globalFunctions.has(funcName)) {
+        this.globalFunctions.set(funcName, []);
+      }
+      this.globalFunctions.get(funcName).push({
+        params,
+        signature,
+        contractName,
+        fromArtifact: true,
+      });
+    }
+  }
+
+  /**
+   * Register an event from an ABI item
+   */
+  _registerArtifactEvent(contractName, eventItem) {
+    const eventName = eventItem.name;
+    if (!eventName) return;
+
+    const params = (eventItem.inputs || []).map((input) => ({
+      name: input.name,
+      type: input.type,
+    }));
+
+    // Skip if any parameter is unnamed
+    if (params.some((p) => !p.name)) return;
+
+    if (!this.events.has(eventName)) {
+      this.events.set(eventName, []);
+    }
+
+    // Check if this event already exists with same param count
+    const existing = this.events.get(eventName);
+    if (!existing.some((e) => e.params.length === params.length)) {
+      existing.push({
+        params,
+        contractName,
+        fromArtifact: true,
+      });
+    }
+  }
+
+  /**
    * Process the AST and register all functions
    */
   _processAST(ast, filePath) {

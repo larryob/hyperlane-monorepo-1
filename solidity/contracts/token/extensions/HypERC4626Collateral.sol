@@ -146,7 +146,11 @@ contract HypERC4626Collateral is TokenRouter {
         address _recipient,
         uint256 _shares
     ) internal virtual override {
-        vault.redeem(_shares, _recipient, address(this));
+        vault.redeem({
+            shares: _shares,
+            receiver: _recipient,
+            owner: address(this)
+        });
     }
 
     /**
