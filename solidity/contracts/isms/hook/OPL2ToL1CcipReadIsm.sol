@@ -117,12 +117,12 @@ abstract contract OPL2ToL1CcipReadIsm is AbstractCcipReadIsm {
         // Proving only if the withdrawal wasn't
         // proven already by this contract
         if (!_isWithdrawalProvenAlready(withdrawalHash)) {
-            opPortal.proveWithdrawalTransaction(
-                _tx,
-                _disputeGameIndex,
-                _outputRootProof,
-                _withdrawalProof
-            );
+            opPortal.proveWithdrawalTransaction({
+                _tx: _tx,
+                _disputeGameIndex: _disputeGameIndex,
+                _outputRootProof: _outputRootProof,
+                _withdrawalProof: _withdrawalProof
+            });
         }
     }
 
