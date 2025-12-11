@@ -372,12 +372,14 @@ export class FunctionRegistry {
    * @param {number} argCount - Number of arguments
    * @param {string|null} contractContext - Contract name to search in
    * @param {boolean} allowGlobalFallback - Whether to fall back to global search (default: true)
+   * @param {Array<string|null>} argTypes - Inferred argument types for disambiguation
    */
   lookupFunction(
     funcName,
     argCount,
     contractContext = null,
     allowGlobalFallback = true,
+    argTypes = null,
   ) {
     // Check if it's a built-in that shouldn't be converted
     if (this._isBuiltInSkip(funcName)) {
@@ -390,6 +392,7 @@ export class FunctionRegistry {
         funcName,
         argCount,
         contractContext,
+        argTypes,
       );
       if (result) return result;
 
@@ -397,7 +400,12 @@ export class FunctionRegistry {
       const bases = this.inheritance.get(contractContext);
       if (bases) {
         for (const base of bases) {
-          const result = this._lookupInContract(funcName, argCount, base);
+          const result = this._lookupInContract(
+            funcName,
+            argCount,
+            base,
+            argTypes,
+          );
           if (result) return result;
         }
       }
@@ -427,16 +435,85 @@ export class FunctionRegistry {
 
     if (matches.length === 1 || allSameParams) {
       return matches[0];
-    } else {
-      // Multiple matches with different parameter names - ambiguous
-      return { ...matches[0], ambiguous: true };
     }
+
+    // Multiple matches with different parameter names - try to disambiguate by types
+    if (argTypes && argTypes.some((t) => t !== null)) {
+      const typeMatch = this._disambiguateByTypes(matches, argTypes);
+      if (typeMatch) {
+        return typeMatch;
+      }
+    }
+
+    // Still ambiguous
+    return { ...matches[0], ambiguous: true };
+  }
+
+  /**
+   * Try to disambiguate overloads by matching argument types
+   */
+  _disambiguateByTypes(matches, argTypes) {
+    const scored = matches.map((func) => {
+      let score = 0;
+      for (let i = 0; i < argTypes.length; i++) {
+        const argType = argTypes[i];
+        const paramType = func.params[i]?.type;
+        if (argType && paramType && this._typesMatch(argType, paramType)) {
+          score++;
+        }
+      }
+      return { func, score };
+    });
+
+    // Sort by score descending
+    scored.sort((a, b) => b.score - a.score);
+
+    // If the top score is unique and better than others, return it
+    if (scored.length >= 1 && scored[0].score > 0) {
+      if (scored.length === 1 || scored[0].score > scored[1].score) {
+        return scored[0].func;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if an inferred argument type matches a parameter type
+   */
+  _typesMatch(argType, paramType) {
+    if (!argType || !paramType) return false;
+
+    // Normalize types for comparison
+    const normalizeType = (t) => {
+      if (!t) return '';
+      // Remove memory/storage/calldata qualifiers for comparison
+      // e.g., "bytes memory" -> "bytes", "string calldata" -> "string"
+      return t
+        .replace(/\s+(memory|storage|calldata)$/i, '')
+        .replace(/\s+/g, '')
+        .toLowerCase();
+    };
+
+    const normArg = normalizeType(argType);
+    const normParam = normalizeType(paramType);
+
+    // Direct match
+    if (normArg === normParam) return true;
+
+    // Handle uint/int without size (default to 256)
+    if (normArg === 'uint' && normParam === 'uint256') return true;
+    if (normArg === 'uint256' && normParam === 'uint') return true;
+    if (normArg === 'int' && normParam === 'int256') return true;
+    if (normArg === 'int256' && normParam === 'int') return true;
+
+    return false;
   }
 
   /**
    * Look up function in a specific contract
    */
-  _lookupInContract(funcName, argCount, contractName) {
+  _lookupInContract(funcName, argCount, contractName, argTypes = null) {
     const contractFuncs = this.contracts.get(contractName);
     if (!contractFuncs) return null;
 
@@ -447,6 +524,13 @@ export class FunctionRegistry {
     if (matches.length === 1) {
       return matches[0];
     } else if (matches.length > 1) {
+      // Try to disambiguate by types
+      if (argTypes && argTypes.some((t) => t !== null)) {
+        const typeMatch = this._disambiguateByTypes(matches, argTypes);
+        if (typeMatch) {
+          return typeMatch;
+        }
+      }
       return { ...matches[0], ambiguous: true };
     }
 

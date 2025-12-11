@@ -224,13 +224,13 @@ contract InterchainAccountRouter is Router, AbstractRoutingIsm {
         bytes32 _router = routers(_destination);
         bytes32 _ism = isms[_destination];
         return
-            callRemoteWithOverrides(
-                _destination,
-                _router,
-                _ism,
-                _calls,
-                _hookMetadata
-            );
+            callRemoteWithOverrides({
+                _destination: _destination,
+                _router: _router,
+                _ism: _ism,
+                _calls: _calls,
+                _hookMetadata: _hookMetadata
+            });
     }
 
     /**
@@ -339,11 +339,11 @@ contract InterchainAccountRouter is Router, AbstractRoutingIsm {
         address _owner
     ) external view returns (address) {
         return
-            getRemoteInterchainAccount(
-                _destination,
-                _owner,
-                InterchainAccountMessage.EMPTY_SALT
-            );
+            getRemoteInterchainAccount({
+                _destination: _destination,
+                _owner: _owner,
+                _userSalt: InterchainAccountMessage.EMPTY_SALT
+            });
     }
 
     /**

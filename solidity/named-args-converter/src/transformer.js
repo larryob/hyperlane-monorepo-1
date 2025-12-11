@@ -275,6 +275,19 @@ export class Transformer {
           }
         }
       },
+      FunctionDefinition(node) {
+        // Track function parameter types
+        if (node.parameters) {
+          for (const param of node.parameters) {
+            if (param.name && param.typeName) {
+              const typeName = self._getTypeName(param.typeName);
+              if (typeName) {
+                self.variableTypes.set(param.name, typeName);
+              }
+            }
+          }
+        }
+      },
       FunctionCall(node) {
         self._processFunctionCall(node, source, currentContract);
       },
@@ -300,6 +313,74 @@ export class Transformer {
   }
 
   /**
+   * Infer the type of an expression AST node
+   * Returns null if type cannot be determined
+   */
+  _inferExpressionType(expr) {
+    if (!expr) return null;
+
+    switch (expr.type) {
+      case 'Identifier':
+        // Look up variable type
+        return this.variableTypes?.get(expr.name) || null;
+
+      case 'NumberLiteral':
+        // Could be uint or int, default to uint256
+        return 'uint256';
+
+      case 'BooleanLiteral':
+        return 'bool';
+
+      case 'StringLiteral':
+        return 'string';
+
+      case 'HexLiteral':
+        return 'bytes';
+
+      case 'TupleExpression':
+        // For single-element tuples, unwrap
+        if (expr.components?.length === 1) {
+          return this._inferExpressionType(expr.components[0]);
+        }
+        return null;
+
+      case 'MemberAccess':
+        // For now, don't try to infer member access types
+        return null;
+
+      case 'IndexAccess':
+        // Array access - would need element type inference
+        return null;
+
+      case 'FunctionCall':
+        // Type conversion: address(x), bytes32(x), etc.
+        if (expr.expression?.type === 'ElementaryTypeName') {
+          return expr.expression.name;
+        }
+        // User-defined type conversion: IFoo(x)
+        if (expr.expression?.type === 'Identifier') {
+          // Could be a type cast, return the type name
+          const name = expr.expression.name;
+          // Check if it looks like a type (starts with uppercase or is a known interface)
+          if (name[0] === name[0].toUpperCase()) {
+            return name;
+          }
+        }
+        return null;
+
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Infer types for all arguments in a function call
+   */
+  _inferArgumentTypes(args) {
+    return args.map((arg) => this._inferExpressionType(arg));
+  }
+
+  /**
    * Process a single function call
    */
   _processFunctionCall(node, source, currentContract) {
@@ -317,6 +398,9 @@ export class Transformer {
 
     // Determine if this is a member access call (e.g., foo.bar(...))
     const isMemberAccess = node.expression.type === 'MemberAccess';
+
+    // Infer argument types for overload disambiguation
+    const argTypes = this._inferArgumentTypes(node.arguments);
 
     // Try to find the function definition
     let contractContext = getContractContext(node.expression);
@@ -340,6 +424,7 @@ export class Transformer {
         node.arguments.length,
         contractContext,
         !isMemberAccess, // allowGlobalFallback: false for member access
+        argTypes,
       );
     }
 
@@ -360,6 +445,8 @@ export class Transformer {
         funcName,
         node.arguments.length,
         currentContract,
+        true,
+        argTypes,
       );
     }
 
@@ -369,6 +456,8 @@ export class Transformer {
         funcName,
         node.arguments.length,
         null,
+        true,
+        argTypes,
       );
     }
 
