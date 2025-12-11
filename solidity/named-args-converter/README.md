@@ -21,6 +21,7 @@ dispatch({
 ```
 
 Benefits:
+
 - **Readability**: Instantly understand what each argument represents
 - **Maintainability**: Easier to add/remove/reorder parameters
 - **Safety**: Compiler catches parameter name mismatches
@@ -60,16 +61,16 @@ node src/cli.js --write --show-diff ./contracts/
 
 ### Options
 
-| Option | Alias | Default | Description |
-|--------|-------|---------|-------------|
-| `--write` | `-w` | false | Write changes to files |
-| `--dry-run` | `-d` | true | Preview changes without writing |
-| `--min-args` | `-m` | 1 | Minimum arguments to require named params |
-| `--verbose` | `-v` | false | Show detailed output |
-| `--pattern` | `-p` | `**/*.sol` | Glob pattern for matching files |
-| `--exclude` | `-e` | node_modules, lib | Patterns to exclude |
-| `--show-diff` | | false | Show before/after for each change |
-| `--json` | | false | Output results as JSON |
+| Option        | Alias | Default           | Description                               |
+| ------------- | ----- | ----------------- | ----------------------------------------- |
+| `--write`     | `-w`  | false             | Write changes to files                    |
+| `--dry-run`   | `-d`  | true              | Preview changes without writing           |
+| `--min-args`  | `-m`  | 1                 | Minimum arguments to require named params |
+| `--verbose`   | `-v`  | false             | Show detailed output                      |
+| `--pattern`   | `-p`  | `**/*.sol`        | Glob pattern for matching files           |
+| `--exclude`   | `-e`  | node_modules, lib | Patterns to exclude                       |
+| `--show-diff` |       | false             | Show before/after for each change         |
+| `--json`      |       | false             | Output results as JSON                    |
 
 ### Examples
 
@@ -94,6 +95,7 @@ The converter operates in two passes:
 ### Pass 1: Build Function Registry
 
 Parses all Solidity files to extract:
+
 - Function definitions with parameter names
 - Event definitions
 - Custom error definitions
@@ -103,6 +105,7 @@ Parses all Solidity files to extract:
 ### Pass 2: Transform Function Calls
 
 For each function call:
+
 1. Look up the function definition in the registry
 2. Match by function name and argument count
 3. Generate named argument syntax
@@ -111,6 +114,7 @@ For each function call:
 ## What Gets Converted
 
 ✅ **Converted:**
+
 - Regular function calls: `foo(a, b)` → `foo({x: a, y: b})`
 - External contract calls: `contract.method(a)` → `contract.method({param: a})`
 - Event emissions: `emit Transfer(from, to, amount)`
@@ -120,6 +124,7 @@ For each function call:
 - Library function calls
 
 ❌ **Skipped:**
+
 - Already using named arguments
 - Built-in functions: `require`, `revert`, `assert`, `keccak256`, etc.
 - ABI functions: `abi.encode`, `abi.encodePacked`, etc.
@@ -150,6 +155,7 @@ If multiple functions have the same name AND same argument count, the call is sk
 ### Missing Definitions
 
 Calls to functions not found in the parsed files are skipped. This includes:
+
 - External library functions (unless imported)
 - Functions from contracts not in the conversion scope
 
@@ -178,7 +184,7 @@ import { NamedArgsConverter } from '@hyperlane-xyz/named-args-converter';
 const converter = new NamedArgsConverter({
   minArgs: 3,
   write: true,
-  verbose: true
+  verbose: true,
 });
 
 // Convert a directory

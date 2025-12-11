@@ -1,7 +1,6 @@
 /**
  * Test suite for the Solidity Named Arguments Converter
  */
-
 import { FunctionRegistry } from './function-registry.js';
 import { Transformer } from './transformer.js';
 
@@ -19,7 +18,7 @@ contract Test {
     expectedChanges: 1,
     checkResult: (result) => {
       return result.source.includes('foo({a: 123, b: 0x0})');
-    }
+    },
   },
   {
     name: 'Already named arguments - should skip',
@@ -30,7 +29,7 @@ contract Test {
         foo({a: 123, b: 0x0});
     }
 }`,
-    expectedChanges: 0
+    expectedChanges: 0,
   },
   {
     name: 'External contract call',
@@ -48,7 +47,7 @@ contract Test {
     expectedChanges: 1,
     checkResult: (result) => {
       return result.source.includes('transfer({to: 0x123, amount: 100})');
-    }
+    },
   },
   {
     name: 'Skip built-in functions',
@@ -60,7 +59,7 @@ contract Test {
         bytes32 h = keccak256(abi.encodePacked("test"));
     }
 }`,
-    expectedChanges: 0
+    expectedChanges: 0,
   },
   {
     name: 'Event emit',
@@ -73,8 +72,10 @@ contract Test {
 }`,
     expectedChanges: 1,
     checkResult: (result) => {
-      return result.source.includes('Transfer({from: msg.sender, to: address(0), amount: 100})');
-    }
+      return result.source.includes(
+        'Transfer({from: msg.sender, to: address(0), amount: 100})',
+      );
+    },
   },
   {
     name: 'Custom error',
@@ -87,8 +88,10 @@ contract Test {
 }`,
     expectedChanges: 1,
     checkResult: (result) => {
-      return result.source.includes('InsufficientBalance({available: 10, required: 100})');
-    }
+      return result.source.includes(
+        'InsufficientBalance({available: 10, required: 100})',
+      );
+    },
   },
   {
     name: 'Function with single argument - respects minArgs',
@@ -100,7 +103,7 @@ contract Test {
     }
 }`,
     minArgs: 2,
-    expectedChanges: 0
+    expectedChanges: 0,
   },
   {
     name: 'Multiple calls to same function',
@@ -113,7 +116,7 @@ contract Test {
         foo(3, 0x3);
     }
 }`,
-    expectedChanges: 3
+    expectedChanges: 3,
   },
   {
     name: 'Skip type conversions',
@@ -124,7 +127,7 @@ contract Test {
         uint256 b = uint256(100);
     }
 }`,
-    expectedChanges: 0
+    expectedChanges: 0,
   },
   {
     name: 'Internal function call',
@@ -140,7 +143,7 @@ contract Test {
     expectedChanges: 1,
     checkResult: (result) => {
       return result.source.includes('_internal({x: 10, y: 20})');
-    }
+    },
   },
   {
     name: 'Library function call',
@@ -160,7 +163,7 @@ contract Test {
     expectedChanges: 1,
     checkResult: (result) => {
       return result.source.includes('add({a: 10, b: 20})');
-    }
+    },
   },
   {
     name: 'Constructor call',
@@ -176,8 +179,10 @@ contract Test {
 }`,
     expectedChanges: 1,
     checkResult: (result) => {
-      return result.source.includes('Token({name: "Test", symbol: "TST", supply: 1000})');
-    }
+      return result.source.includes(
+        'Token({name: "Test", symbol: "TST", supply: 1000})',
+      );
+    },
   },
   {
     name: 'Complex expression arguments',
@@ -191,7 +196,7 @@ contract Test {
     expectedChanges: 1,
     checkResult: (result) => {
       return result.source.includes('foo({a: x * 2, b: x + 1})');
-    }
+    },
   },
   {
     name: 'Nested function calls',
@@ -203,7 +208,7 @@ contract Test {
         bar(foo(1), foo(2));
     }
 }`,
-    expectedChanges: 3  // outer call + 2 inner calls
+    expectedChanges: 3, // outer call + 2 inner calls
   },
   {
     name: 'Skip ABI functions',
@@ -215,7 +220,7 @@ contract Test {
         abi.encodePacked(1, 2, 3);
     }
 }`,
-    expectedChanges: 0
+    expectedChanges: 0,
   },
   {
     name: 'Overloaded functions - should match by arg count',
@@ -228,7 +233,7 @@ contract Test {
         foo(1, 2);
     }
 }`,
-    expectedChanges: 2
+    expectedChanges: 2,
   },
   {
     name: 'Skip address.transfer built-in',
@@ -238,7 +243,7 @@ contract Test {
         payable(msg.sender).transfer(100);
     }
 }`,
-    expectedChanges: 0
+    expectedChanges: 0,
   },
   {
     name: 'Skip low-level call built-in',
@@ -248,7 +253,7 @@ contract Test {
         address(this).call{value: 1}("");
     }
 }`,
-    expectedChanges: 0
+    expectedChanges: 0,
   },
   {
     name: 'Interface function with matching arg count',
@@ -266,7 +271,7 @@ contract Test {
     expectedChanges: 1,
     checkResult: (result) => {
       return result.source.includes('transfer({to: address(0), amount: 100})');
-    }
+    },
   },
   {
     name: 'Chained member access',
@@ -285,46 +290,48 @@ contract Test {
 }`,
     // This is more complex - would need deeper type tracking
     // For now, we fall back to global lookup
-    expectedChanges: 1
-  }
+    expectedChanges: 1,
+  },
 ];
 
 // Run tests
 async function runTests() {
   console.log('Running Named Arguments Converter Tests\n');
   console.log('='.repeat(50));
-  
+
   let passed = 0;
   let failed = 0;
-  
+
   for (const test of testCases) {
     try {
       // Create fresh registry and transformer for each test
       const registry = new FunctionRegistry();
       registry.parseFile('test.sol', test.source);
-      
+
       const transformer = new Transformer(registry, {
         minArgs: test.minArgs || 1,
-        verbose: false
+        verbose: false,
       });
-      
+
       const result = transformer.transform(test.source, 'test.sol');
-      
+
       // Check expected changes count
       const changesMatch = result.changes.length === test.expectedChanges;
-      
+
       // Check result if provided
       let resultCheck = true;
       if (test.checkResult && result.changes.length > 0) {
         resultCheck = test.checkResult(result);
       }
-      
+
       if (changesMatch && resultCheck) {
         console.log(`✅ ${test.name}`);
         passed++;
       } else {
         console.log(`❌ ${test.name}`);
-        console.log(`   Expected ${test.expectedChanges} changes, got ${result.changes.length}`);
+        console.log(
+          `   Expected ${test.expectedChanges} changes, got ${result.changes.length}`,
+        );
         if (!resultCheck) {
           console.log(`   Result check failed`);
           console.log(`   Output:\n${result.source}`);
@@ -337,14 +344,14 @@ async function runTests() {
       failed++;
     }
   }
-  
+
   console.log('\n' + '='.repeat(50));
   console.log(`Results: ${passed} passed, ${failed} failed`);
-  
+
   return failed === 0;
 }
 
 // Run if executed directly
-runTests().then(success => {
+runTests().then((success) => {
   process.exit(success ? 0 : 1);
 });

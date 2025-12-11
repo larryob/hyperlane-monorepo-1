@@ -1,6 +1,6 @@
 /**
  * FunctionRegistry - Collects and indexes all function definitions from Solidity files
- * 
+ *
  * This module handles:
  * - Contract/library/interface function definitions
  * - Function overloading (multiple functions with same name but different parameters)
@@ -9,23 +9,24 @@
  * - Custom error definitions
  * - Modifier definitions
  */
-
 import parser from '@solidity-parser/parser';
 import fs from 'fs';
-import path from 'path';
 import { glob } from 'glob';
+import path from 'path';
 
 /**
  * Creates a signature key for a function based on name and parameter count/types
  */
 function createSignatureKey(name, params) {
   if (!params || params.length === 0) return `${name}()`;
-  
-  const paramTypes = params.map(p => {
-    if (!p.typeName) return 'unknown';
-    return getTypeName(p.typeName);
-  }).join(',');
-  
+
+  const paramTypes = params
+    .map((p) => {
+      if (!p.typeName) return 'unknown';
+      return getTypeName(p.typeName);
+    })
+    .join(',');
+
   return `${name}(${paramTypes})`;
 }
 
@@ -34,7 +35,7 @@ function createSignatureKey(name, params) {
  */
 function getTypeName(typeName) {
   if (!typeName) return 'unknown';
-  
+
   switch (typeName.type) {
     case 'ElementaryTypeName':
       return typeName.name;
@@ -84,16 +85,16 @@ export class FunctionRegistry {
       if (!source) {
         source = fs.readFileSync(filePath, 'utf8');
       }
-      
+
       const ast = parser.parse(source, {
         loc: true,
         range: true,
-        tolerant: true
+        tolerant: true,
       });
-      
+
       this.parsedFiles.set(filePath, { source, ast });
       this._processAST(ast, filePath);
-      
+
       return ast;
     } catch (error) {
       console.error(`Error parsing ${filePath}:`, error.message);
@@ -106,11 +107,11 @@ export class FunctionRegistry {
    */
   async parseDirectory(directory, pattern = '**/*.sol') {
     const files = await glob(pattern, { cwd: directory, absolute: true });
-    
+
     for (const file of files) {
       this.parseFile(file);
     }
-    
+
     return files.length;
   }
 
@@ -119,7 +120,7 @@ export class FunctionRegistry {
    */
   _processAST(ast, filePath) {
     if (!ast || !ast.children) return;
-    
+
     for (const node of ast.children) {
       switch (node.type) {
         case 'ContractDefinition':
@@ -137,17 +138,19 @@ export class FunctionRegistry {
    */
   _processContract(contract, filePath) {
     const contractName = contract.name;
-    
+
     if (!this.contracts.has(contractName)) {
       this.contracts.set(contractName, new Map());
     }
-    
+
     // Record inheritance
     if (contract.baseContracts && contract.baseContracts.length > 0) {
-      const baseNames = contract.baseContracts.map(bc => bc.baseName.namePath);
+      const baseNames = contract.baseContracts.map(
+        (bc) => bc.baseName.namePath,
+      );
       this.inheritance.set(contractName, baseNames);
     }
-    
+
     // Process sub-nodes
     for (const node of contract.subNodes || []) {
       switch (node.type) {
@@ -174,32 +177,33 @@ export class FunctionRegistry {
    * Register a function definition
    */
   _registerFunction(contractName, funcDef) {
-    const funcName = funcDef.name || (funcDef.isConstructor ? 'constructor' : null);
+    const funcName =
+      funcDef.name || (funcDef.isConstructor ? 'constructor' : null);
     if (!funcName) return;
-    
+
     const params = funcDef.parameters || [];
-    const paramInfo = params.map(p => ({
+    const paramInfo = params.map((p) => ({
       name: p.name,
       type: getTypeName(p.typeName),
-      typeName: p.typeName
+      typeName: p.typeName,
     }));
-    
+
     const signature = createSignatureKey(funcName, params);
-    
+
     const contractFuncs = this.contracts.get(contractName);
     if (!contractFuncs.has(funcName)) {
       contractFuncs.set(funcName, []);
     }
-    
+
     contractFuncs.get(funcName).push({
       params: paramInfo,
       signature,
       isConstructor: funcDef.isConstructor,
       visibility: funcDef.visibility,
       loc: funcDef.loc,
-      range: funcDef.range
+      range: funcDef.range,
     });
-    
+
     // Also add to global functions for fallback lookup
     if (!this.globalFunctions.has(funcName)) {
       this.globalFunctions.set(funcName, []);
@@ -207,7 +211,7 @@ export class FunctionRegistry {
     this.globalFunctions.get(funcName).push({
       params: paramInfo,
       signature,
-      contractName
+      contractName,
     });
   }
 
@@ -217,17 +221,17 @@ export class FunctionRegistry {
   _registerEvent(contractName, eventDef) {
     const eventName = eventDef.name;
     const params = eventDef.parameters || [];
-    const paramInfo = params.map(p => ({
+    const paramInfo = params.map((p) => ({
       name: p.name,
-      type: getTypeName(p.typeName)
+      type: getTypeName(p.typeName),
     }));
-    
+
     if (!this.events.has(eventName)) {
       this.events.set(eventName, []);
     }
     this.events.get(eventName).push({
       params: paramInfo,
-      contractName
+      contractName,
     });
   }
 
@@ -237,17 +241,17 @@ export class FunctionRegistry {
   _registerError(contractName, errorDef) {
     const errorName = errorDef.name;
     const params = errorDef.parameters || [];
-    const paramInfo = params.map(p => ({
+    const paramInfo = params.map((p) => ({
       name: p.name,
-      type: getTypeName(p.typeName)
+      type: getTypeName(p.typeName),
     }));
-    
+
     if (!this.errors.has(errorName)) {
       this.errors.set(errorName, []);
     }
     this.errors.get(errorName).push({
       params: paramInfo,
-      contractName
+      contractName,
     });
   }
 
@@ -257,17 +261,17 @@ export class FunctionRegistry {
   _registerModifier(contractName, modDef) {
     const modName = modDef.name;
     const params = modDef.parameters || [];
-    const paramInfo = params.map(p => ({
+    const paramInfo = params.map((p) => ({
       name: p.name,
-      type: getTypeName(p.typeName)
+      type: getTypeName(p.typeName),
     }));
-    
+
     if (!this.modifiers.has(modName)) {
       this.modifiers.set(modName, []);
     }
     this.modifiers.get(modName).push({
       params: paramInfo,
-      contractName
+      contractName,
     });
   }
 
@@ -277,11 +281,11 @@ export class FunctionRegistry {
   _processUsingFor(contractName, usingFor) {
     const libraryName = usingFor.libraryName;
     const typeName = usingFor.typeName ? getTypeName(usingFor.typeName) : '*';
-    
+
     if (!this.usingFor.has(contractName)) {
       this.usingFor.set(contractName, new Map());
     }
-    
+
     const contractUsing = this.usingFor.get(contractName);
     if (!contractUsing.has(typeName)) {
       contractUsing.set(typeName, []);
@@ -295,14 +299,14 @@ export class FunctionRegistry {
   _processImport(importNode, filePath) {
     const importPath = importNode.path;
     const dirPath = path.dirname(filePath);
-    
+
     // Record symbol aliases
     if (importNode.symbolAliases) {
       for (const [symbol, alias] of importNode.symbolAliases) {
         this.imports.set(alias || symbol, { symbol, importPath, filePath });
       }
     }
-    
+
     if (importNode.unitAlias) {
       this.imports.set(importNode.unitAlias, { importPath, filePath });
     }
@@ -316,12 +320,16 @@ export class FunctionRegistry {
     if (this._isBuiltInSkip(funcName)) {
       return null;
     }
-    
+
     // Try to find in specific contract
     if (contractContext) {
-      const result = this._lookupInContract(funcName, argCount, contractContext);
+      const result = this._lookupInContract(
+        funcName,
+        argCount,
+        contractContext,
+      );
       if (result) return result;
-      
+
       // Check inherited contracts
       const bases = this.inheritance.get(contractContext);
       if (bases) {
@@ -331,20 +339,20 @@ export class FunctionRegistry {
         }
       }
     }
-    
+
     // Fallback to global search
     const funcs = this.globalFunctions.get(funcName);
     if (!funcs) return null;
-    
+
     // Find best match by argument count
-    const matches = funcs.filter(f => f.params.length === argCount);
+    const matches = funcs.filter((f) => f.params.length === argCount);
     if (matches.length === 1) {
       return matches[0];
     } else if (matches.length > 1) {
       // Multiple matches - return first one but mark as ambiguous
       return { ...matches[0], ambiguous: true };
     }
-    
+
     return null;
   }
 
@@ -354,17 +362,17 @@ export class FunctionRegistry {
   _lookupInContract(funcName, argCount, contractName) {
     const contractFuncs = this.contracts.get(contractName);
     if (!contractFuncs) return null;
-    
+
     const funcs = contractFuncs.get(funcName);
     if (!funcs) return null;
-    
-    const matches = funcs.filter(f => f.params.length === argCount);
+
+    const matches = funcs.filter((f) => f.params.length === argCount);
     if (matches.length === 1) {
       return matches[0];
     } else if (matches.length > 1) {
       return { ...matches[0], ambiguous: true };
     }
-    
+
     return null;
   }
 
@@ -374,8 +382,8 @@ export class FunctionRegistry {
   lookupEvent(eventName, argCount) {
     const events = this.events.get(eventName);
     if (!events) return null;
-    
-    const matches = events.filter(e => e.params.length === argCount);
+
+    const matches = events.filter((e) => e.params.length === argCount);
     return matches.length > 0 ? matches[0] : null;
   }
 
@@ -385,8 +393,8 @@ export class FunctionRegistry {
   lookupError(errorName, argCount) {
     const errors = this.errors.get(errorName);
     if (!errors) return null;
-    
-    const matches = errors.filter(e => e.params.length === argCount);
+
+    const matches = errors.filter((e) => e.params.length === argCount);
     return matches.length > 0 ? matches[0] : null;
   }
 
@@ -396,21 +404,51 @@ export class FunctionRegistry {
   _isBuiltInSkip(funcName) {
     const builtIns = new Set([
       // ABI encoding/decoding - these use positional args
-      'encode', 'encodePacked', 'encodeWithSelector', 'encodeWithSignature',
-      'encodeCall', 'decode',
+      'encode',
+      'encodePacked',
+      'encodeWithSelector',
+      'encodeWithSignature',
+      'encodeCall',
+      'decode',
       // Type conversions
-      'address', 'uint256', 'uint128', 'uint64', 'uint32', 'uint16', 'uint8',
-      'int256', 'int128', 'int64', 'int32', 'int16', 'int8',
-      'bytes32', 'bytes', 'string', 'bool',
+      'address',
+      'uint256',
+      'uint128',
+      'uint64',
+      'uint32',
+      'uint16',
+      'uint8',
+      'int256',
+      'int128',
+      'int64',
+      'int32',
+      'int16',
+      'int8',
+      'bytes32',
+      'bytes',
+      'string',
+      'bool',
       // Special built-ins
-      'require', 'revert', 'assert', 'keccak256', 'sha256', 'ripemd160',
-      'ecrecover', 'addmod', 'mulmod', 'blockhash', 'selfdestruct',
+      'require',
+      'revert',
+      'assert',
+      'keccak256',
+      'sha256',
+      'ripemd160',
+      'ecrecover',
+      'addmod',
+      'mulmod',
+      'blockhash',
+      'selfdestruct',
       // Array operations
-      'push', 'pop',
+      'push',
+      'pop',
       // Low level
-      'call', 'delegatecall', 'staticcall'
+      'call',
+      'delegatecall',
+      'staticcall',
     ]);
-    
+
     return builtIns.has(funcName);
   }
 
@@ -424,13 +462,13 @@ export class FunctionRegistry {
         totalFunctions += overloads.length;
       }
     }
-    
+
     return {
       contracts: this.contracts.size,
       functions: totalFunctions,
       events: this.events.size,
       errors: this.errors.size,
-      modifiers: this.modifiers.size
+      modifiers: this.modifiers.size,
     };
   }
 }
