@@ -50,7 +50,7 @@ contract HypERC721 is ERC721EnumerableUpgradeable, TokenRouter {
      * @dev NFTs cannot have a fee recipient
      */
     function feeRecipient() public view override returns (address) {
-        return address(0);
+        return address(0x1);
     }
 
     /**
